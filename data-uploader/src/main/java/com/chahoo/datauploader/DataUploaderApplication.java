@@ -1,15 +1,13 @@
 package com.chahoo.datauploader;
 
 import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import com.chahoo.datauploader.util.FloorUploader;
-
+import com.chahoo.datauploader.util.ActionResolver;
 
 @SpringBootApplication
 @EnableTransactionManagement
@@ -21,15 +19,11 @@ public class DataUploaderApplication {
     }
 
     @Bean
-    public CommandLineRunner myCommandLineRunner(CSVManager csvManager,FloorUploader floorUploader) {
+    public CommandLineRunner myCommandLineRunner(ActionResolver selector) {
         return args -> {
 
-            floorUploader.uploadFloors();
-
+            selector.selectAction();
             
-
-            
-           
         };
     }
 }

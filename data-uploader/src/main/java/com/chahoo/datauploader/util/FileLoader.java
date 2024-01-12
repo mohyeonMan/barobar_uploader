@@ -1,21 +1,15 @@
-package com.chahoo.datauploader;
+package com.chahoo.datauploader.util;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
-import net.sf.jsqlparser.expression.TryCastExpression;
 
 @Component
 @Data
@@ -59,10 +53,27 @@ public class FileLoader {
         System.out.println("파일을 찾을 수 없습니다.");
         System.exit(0);
         return null;
-        
 
+    }
 
+    public static void loadShpFile(String directory,String fileName){
 
+        String filePath = directory+File.separator+fileName;
+        File file = new File(filePath);
+        if(file.exists()){
+            try {
+                System.out.println("exists");
+            } catch (Exception e) {
+                System.out.println("파일을 불러오는 중 문제가 발생하였습니다.");
+                System.exit(0);
+            }
+        }
+        System.out.println("파일을 찾을 수 없습니다.");
+        System.exit(0);
+    }
+
+    public static String convertPropertyUTF8(String data){
+        return new String(data.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
     }
 
 }

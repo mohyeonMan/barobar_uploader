@@ -5,44 +5,315 @@
 <mapper namespace="com.chahoo.datauploader.mapper.DataMapper">
     
     <select id="selectTest" resultType="Map" >
-        select * from floor
+        select * FROM ${schemaName}.floor
     </select>
 
+    <select id="createSchema" parameterType="String" resultType="boolean">
+        SELECT createSchema('${schemaName}')
+    </select>
 
+    <select id="createGeomIndex" parameterType="String" resultType="String">
+        SELECT createGeomIndex('${schemaName}')
+    </select>
 
-    <insert id="insertFloors" parameterType="hashMap">
-        INSERT INTO floor_test
-        select
-            nextval('floor_id_seq') as floor_id
-            , b.building_id as building_id
+    <select id="createSeq" parameterType="String" resultType="String">
+        SELECT createSeq('${schemaName}')
+    </select>
+    
+
+    <insert id="insertDrawing" parameterType="hashMap">
+        INSERT INTO ${schemaName}.drawing
+        SELECT
+            nextval('${schemaName}.drawing_id_seq') as drawing_id
             , st_extent(st_union(
                 st_makepoint(#{x1}::double precision
                 , #{y1}::double precision) 
                 , st_makepoint(#{x2}::double precision
-                , #{y2}::double precision ))) as areas_geom
+                , #{y2}::double precision ))
+            ) as area_geom
+            , #{drawing_name} as drawing_name
+        WHERE NOT EXISTS(
+            SELECT 1 FROM ${schemaName}.drawing 
+            where area_geom =
+            (select st_extent(st_union(
+                        st_makepoint(#{x1}::double precision
+                        , #{y1}::double precision) 
+                        , st_makepoint(#{x2}::double precision
+                        , #{y2}::double precision ))))
+            and drawing_name = #{drawing_name} 
+        )
+    </insert>
+
+    <insert id="insertFloors" parameterType="hashMap">
+        INSERT INTO ${schemaName}.floor
+        SELECT
+            nextval('${schemaName}.floor_id_seq') as floor_id
+            , b.building_id as building_id
+            , (SELECT 
+                    drawing_id
+                FROM 
+                    ${schemaName}.drawing WHERE area_geom =
+                    (select st_extent(st_union(
+                        st_makepoint(#{x1}::double precision
+                        , #{y1}::double precision) 
+                        , st_makepoint(#{x2}::double precision
+                        , #{y2}::double precision ))))
+            ) as drawing_id
             , #{floor_order}::integer as floor_order
             , #{floor_name} as floor_name
-            , now() as reg_date
+            , now()::timestamp as reg_date
         from 
-            building_test b
+            ${schemaName}.building b
         where
             building_name = #{building_name}
+        AND NOT EXISTS (
+            SELECT 1
+            FROM ${schemaName}.floor 
+            WHERE building_id = b.building_id
+            AND floor_order = #{floor_order}::integer
+            AND floor_name = #{floor_name}
+        )
         group by b.building_id
-
     </insert>
 
     <insert id="insertBuilding" parameterType="hashMap">
-        INSERT INTO building_test
+        INSERT INTO ${schemaName}.building
         SELECT
-            nextval('building_id_seq') as building_id
+            nextval('${schemaName}.building_id_seq') as building_id
             ,#{building_name}
             ,#{building_category}
-
+         WHERE NOT EXISTS(
+            SELECT 1 FROM ${schemaName}.building 
+            WHERE building_name = #{building_name}
+            AND building_category = #{building_category}
+        )
     </insert>
     
     <select id="isExistProdType" parameterType="String" resultType="Integer" >
-        select count(*) from prod_type where prod_type_name = #{prodTypeName}
+        select count(*) from ${schemaName}.prod_type where prod_type_name = #{prodTypeName}
     </select>
+
+    <insert id="insertPart" parameterType="hashMap">
+        INSERT INTO ${schemaName}.part
+        SELECT
+            nextval('${schemaName}.part_id_seq') as part_id
+            ,#{partName}
+            ,now()
+            ,null
+            ,'Y'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.part
+            WHERE part_name = #{partName}
+        )
+    </insert>
+
+    <insert id="insertProdType" parameterType="hashMap">
+        INSERT INTO ${schemaName}.prod_type
+        SELECT
+            nextval('${schemaName}.prod_type_id_seq') as prod_type_id
+            ,#{prodTypeName} as prod_type_name
+            ,'#000000'
+            ,now()
+            ,now()
+            ,(select part_id from ${schemaName}.part where part_name = #{partName} limit 1) as part_id
+            ,'Y'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName}
+            and part_id = (select part_id from ${schemaName}.part where part_name = #{partName} limit 1)
+        )
+    </insert>
+
+    <insert id="insertHeader" parameterType="hashMap">
+        INSERT INTO ${schemaName}.prod_detail_header 
+        SELECT
+            nextval('${schemaName}.prod_detail_header_id_seq') as prod_detail_header_id_seq
+            ,#{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] as header_arr
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+        )
+    </insert>
+
+
+
+    <select id="selectBuildingIdList" parameterType="hashMap" resultType="integer" >
+        SELECT 
+            building_id
+        FROM
+            ${schemaName}.building
+        <where>
+            <if test="materialCategory != null and !materialCategory.isEmpty() and !materialCategory.equals('공통')">
+            AND building_category = #{materialCategory}
+            </if>
+            <if test="building != null and !building.isEmpty() and !building.equals('공통')">
+            AND building_name = #{building}
+            </if>
+        </where>
+
+    </select>
+    <select id="selectFloorIdList" parameterType="hashMap" resultType="integer" >
+        SELECT floor_id
+        FROM ${schemaName}.floor
+        WHERE building_id = #{buildingId}
+        <if test= "!fromFloor.equals('ALL') and !toFloor.equals('ALL')">
+        AND NOT (
+            (SELECT floor_order
+            FROM ${schemaName}.floor
+            WHERE building_id = #{buildingId} AND floor_name = #{fromFloor}) IS NULL
+            AND
+            (SELECT floor_order
+            FROM ${schemaName}.floor
+            WHERE building_id = #{buildingId} AND floor_name = #{toFloor}) IS NULL
+        )
+        AND floor_order <![CDATA[>=]]> (
+            COALESCE(
+            (SELECT floor_order
+            FROM ${schemaName}.floor
+            WHERE building_id = #{buildingId} AND floor_name = #{fromFloor})
+            ,(SELECT MIN(floor_order) FROM ${schemaName}.floor WHERE building_id = #{buildingId})
+            )
+        )
+        AND floor_order <![CDATA[<=]]> (
+            COALESCE(
+            (SELECT floor_order
+            FROM ${schemaName}.floor
+            WHERE building_id = #{buildingId} AND floor_name = #{toFloor})
+            ,(SELECT MAX(floor_order) FROM ${schemaName}.floor WHERE building_id = #{buildingId})
+            )
+        )
+           
+        </if>
+    </select>
+
+    <insert id="insertProdDetail" parameterType="hashMap">
+        INSERT INTO ${schemaName}.prod_detail
+        SELECT
+            nextval('${schemaName}.prod_detail_id_seq') as prod_detail_id
+            ,(SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName} LIMIT 1) as prod_type_id
+            ,#{floorId, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::bigint[] as floor_id
+            ,(SELECT prod_detail_header_id FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] LIMIT 1) as header_id
+            ,#{dataArr, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] as data_arr
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.prod_detail 
+            WHERE
+                prod_type_id = (SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName} LIMIT 1)
+                AND
+                floor_id = #{floorId, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::bigint[]
+                AND
+                header_id = (SELECT prod_detail_header_id FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] LIMIT 1)
+                AND
+                data_arr = #{dataArr, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+        ) 
+    </insert>
+
+    <select id="selectProdDetail" parameterType="hashMap" resultType="integer">
+    SELECT prod_detail_id 
+    FROM
+        ${schemaName}.prod_detail 
+    WHERE
+        prod_type_id = (SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName})
+        AND
+        floor_id = #{floorId, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::bigint[]
+        AND
+        header_id = (SELECT prod_detail_header_id FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[])
+        AND
+        data_arr = #{dataArr, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+    </select>
+
+
+    <insert id="insertSubDrawing" parameterType="hashMap">
+        INSERT INTO ${schemaName}.prod_sub_drawing
+        SELECT
+            nextval('${schemaName}.prod_sub_drawing_id_seq') as prod_sub_drawing_id
+            ,ST_MakeEnvelope(
+                #{x1}::double precision
+                ,#{y1}::double precision
+                ,#{x2}::double precision
+                ,#{y2}::double precision
+            )::geometry as area_geom 
+            ,'Y' as use_yn
+            ,(
+                SELECT prod_detail_id 
+                FROM
+                    ${schemaName}.prod_detail 
+                WHERE
+                    prod_type_id = (SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName} LIMIT 1)
+                    AND
+                    floor_id = #{floorId, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::bigint[]
+                    AND
+                    header_id = (SELECT prod_detail_header_id FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] LIMIT 1)
+                    AND
+                    data_arr = #{dataArr, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+            ) as prod_detail_id
+            ,#{subDrawingName}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.prod_sub_drawing 
+            WHERE 
+                area_geom = ST_MakeEnvelope(#{x1},#{y1},#{x2},#{y2})
+                AND
+                prod_detail_id = (
+                    SELECT prod_detail_id FROM ${schemaName}.prod_detail 
+                    WHERE
+                        prod_type_id = (SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName} LIMIT 1)
+                        AND
+                        floor_id = #{floorId, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::bigint[]
+                        AND
+                        header_id = (SELECT prod_detail_header_id FROM ${schemaName}.prod_detail_header WHERE header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[] LIMIT 1)
+                        AND
+                        data_arr = #{dataArr, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+                )
+                AND prod_sub_drawing_name = #{subDrawingName}
+        )
+    </insert>
+    <select id="selectTagList" parameterType="HashMap" resultType="hashMap">
+        SELECT name,st_astext(geom) as geom FROM ${schemaName}.tags WHERE map_name = #{tagDwgName}
+    </select>
+    <insert id="insertGisPoints" parameterType="hashMap" useGeneratedKeys="true" keyProperty="point_id">
+        INSERT INTO ${schemaName}.gis_points
+            SELECT
+                nextval('${schemaName}.gis_points_id_seq') as point_id
+                ,0 as point_separator
+                ,st_geomfromtext(#{geom}) as geom
+                ,a.drawing_id
+                ,'Y'
+            FROM
+            (
+                SELECT drawing_id,area_geom
+                FROM ${schemaName}.drawing
+                WHERE drawing_id in(
+                    SELECT drawing_id 
+                    FROM ${schemaName}.floor 
+                    WHERE building_id in(
+                        SELECT building_id
+                        FROM ${schemaName}.building
+                        WHERE building_category = #{category}
+                    )
+                )
+            ) a
+            WHERE st_intersects(a.area_geom,#{geom})
+            AND NOT EXISTS(
+                SELECT 1 FROM ${schemaName}.gis_points
+                WHERE st_astext(geom) = #{geom}
+                AND drawing_id = a.drawing_id
+            )
+        RETURNING point_id 
+    </insert>
+
+    <insert id="insertProd" parameterType="hashMap" >
+        INSERT INTO ${schemaName}.prod
+            SELECT
+                nextval('${schemaName}.prod_id_seq') as prod_id
+                ,#{point_id} as point_id
+                ,(SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName}) as prod_type_id
+                ,'#000000' as prod_color
+                ,now() as reg_date
+                ,null as updt_date
+                ,'Y' as use_yn
+            WHERE NOT EXISTS(
+                SELECT 1 FROM ${schemaName}.prod
+                WHERE point_id = #{point_id}
+            )
+    </insert>
+
 
 
 </mapper>
