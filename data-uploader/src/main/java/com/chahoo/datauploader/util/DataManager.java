@@ -130,7 +130,6 @@ public class DataManager {
                 data.put("building_name", building.trim());
                 data.put("building_category", category);
 
-                System.out.println(data.entrySet().toString());
                 dataRepo.insertBuilding(data);
                 surfaceOrder = baseLevel;
                 underOrder = baseLevel;
@@ -220,7 +219,18 @@ public class DataManager {
                 Row row = sheet.getRow(i);
                 String rowData = "";
                 for(Cell cell : row){
-                    rowData = rowData + cell.getStringCellValue()+"|";
+                    String cellValue="";
+                    switch (cell.getCellType()) {
+                        case NUMERIC:
+                            cellValue = String.valueOf((int)cell.getNumericCellValue());
+                            break;
+                        case STRING:
+                            cellValue = cell.getStringCellValue();
+                            break;
+                        default:
+                            break;
+                    }
+                    rowData = rowData + cellValue +"|";                
                 }
 
                 strArr[i] = rowData.replaceAll("\\|$", "");
@@ -429,34 +439,19 @@ public class DataManager {
         System.out.println("\t-"+partName+" 업로드 완료-\n");
     }
 
+
     @Transactional
     public void matchTags(){
 
         System.out.println("\n\n<tags 안의 "+tagDwgName+" 데이터를 " +tagCategory+" 분류로 업로드합니다.>\n\n");
-        
+
         HashMap<String,Object> params = new HashMap<>();
         params.put("schemaName", schemaName);
         params.put("tagDwgName", tagDwgName);
-        List<HashMap<String,Object>> tagList = dataRepo.selectTagList(params);
-        params.clear();
-
         params.put("category", tagCategory);
-        for(HashMap<String,Object> tag : tagList){
-            String name = (String)tag.get("name");
-            String geom = (String)tag.get("geom");
-
-            params.put("schemaName", schemaName);
-            params.put("prodTypeName", name);
-            params.put("geom", geom);
-
-            dataRepo.insertGisPoints(params);
-            if(params.get("point_id") != null){
-                dataRepo.insertProd(params);
-            }
-
-            System.out.println(name +" / "+geom);
-            
-        }
+        dataRepo.insertGisPoints(params);
+        dataRepo.insertProd(params);
+        params.clear();
 
         System.out.println("\n\n<"+tagCategory+" 태그 업로드 완료>\n\n");
         

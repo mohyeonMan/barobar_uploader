@@ -248,7 +248,7 @@
         WHERE NOT EXISTS (
             SELECT 1 FROM ${schemaName}.prod_sub_drawing 
             WHERE 
-                area_geom = ST_MakeEnvelope(#{x1},#{y1},#{x2},#{y2})
+                st_astext(area_geom) = st_astext(ST_MakeEnvelope(#{x1},#{y1},#{x2},#{y2}))
                 AND
                 prod_detail_id = (
                     SELECT prod_detail_id FROM ${schemaName}.prod_detail 
@@ -267,7 +267,7 @@
     <select id="selectTagList" parameterType="HashMap" resultType="hashMap">
         SELECT name,st_astext(geom) as geom FROM ${schemaName}.tags WHERE map_name = #{tagDwgName}
     </select>
-    <insert id="insertGisPoints" parameterType="hashMap" useGeneratedKeys="true" keyProperty="point_id">
+    <!-- <insert id="insertGisPoints" parameterType="hashMap" useGeneratedKeys="true" keyProperty="point_id">
         INSERT INTO ${schemaName}.gis_points
             SELECT
                 nextval('${schemaName}.gis_points_id_seq') as point_id
@@ -296,22 +296,45 @@
                 AND drawing_id = a.drawing_id
             )
         RETURNING point_id 
+    </insert> -->
+    <insert id="insertGisPoints" parameterType="hashMap">
+        INSERT INTO ${schemaName}.gis_points
+        select
+            nextval('${schemaName}.gis_points_id_seq') as point_id
+            ,0 as point_separator
+            ,t.geom as geom
+            ,f.floor_id as floor_id
+            ,'Y' as use_yn
+        from 
+           ${schemaName}.floor f
+            join ${schemaName}.drawing d on f.drawing_id = d.drawing_id
+            right join ${schemaName}.tags t on st_intersects(d.area_geom,t.geom) and t.map_name = #{tagDwgName}
+        where f.building_id in(select building_id from ${schemaName}.building where building_category=#{category})
+        AND NOT EXISTS(
+                SELECT 1 FROM ${schemaName}.gis_points
+                WHERE geom = t.geom
+                AND floor_id = f.floor_id
+            )
     </insert>
 
     <insert id="insertProd" parameterType="hashMap" >
         INSERT INTO ${schemaName}.prod
             SELECT
                 nextval('${schemaName}.prod_id_seq') as prod_id
-                ,#{point_id} as point_id
-                ,(SELECT prod_type_id FROM ${schemaName}.prod_type WHERE prod_type_name = #{prodTypeName}) as prod_type_id
+                ,p.point_id
+                ,pt.prod_type_id
                 ,'#000000' as prod_color
                 ,now() as reg_date
-                ,null as updt_date
-                ,'Y' as use_yn
-            WHERE NOT EXISTS(
-                SELECT 1 FROM ${schemaName}.prod
-                WHERE point_id = #{point_id}
-            )
+                ,null as updt_date 
+                ,'Y' as use_yn           
+            FROM
+                ${schemaName}.gis_points p
+                left join ${schemaName}.tags t on st_intersects(p.geom,t.geom) and t.map_name = #{tagDwgName}
+                left join ${schemaName}.prod_type pt on t.name = pt.prod_type_name
+                join ${schemaName}.floor f on f.floor_id = p.floor_id
+                join ${schemaName}.building b on f.building_id = b.building_id
+            where
+                b.building_category = #{category}
     </insert>
 
 
