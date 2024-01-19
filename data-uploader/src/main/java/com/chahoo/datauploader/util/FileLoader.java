@@ -5,6 +5,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
@@ -17,7 +20,7 @@ public class FileLoader {
     
     
     public static String[] loadCSVFile(String directory, String fileName){
-        String filePath = directory+File.separator+fileName;
+        String filePath = directory.replace("\\", "/")+File.separator+fileName;
         File file = new File(filePath);
         byte[] temp = null;
 
@@ -40,7 +43,9 @@ public class FileLoader {
 
     public static Workbook loadXLSXFile(String directory,String fileName){
 
-        String filePath = directory+File.separator+fileName;
+        System.out.println(directory + " 경로의 " + fileName + " 파일을 읽어들입니다.\n\n");
+
+        String filePath = directory.replace("\\", "/")+File.separator+fileName;
         File file = new File(filePath);
         if(file.exists()){
             try {
@@ -72,8 +77,35 @@ public class FileLoader {
         System.exit(0);
     }
 
-    public static String convertPropertyUTF8(String data){
-        return new String(data.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+    public static String[] getStringArrFromSheet(Sheet sheet){
+        String[] strArr = new String[sheet.getLastRowNum()+1];
+        for(int i =0; i<= sheet.getLastRowNum();i++){
+            try{
+                Row row = sheet.getRow(i);
+                String rowData = "";
+                for(Cell cell : row){
+                    String cellValue="";
+                    switch (cell.getCellType()) {
+                        case NUMERIC:
+                            cellValue = String.valueOf((int)cell.getNumericCellValue())+"|";
+                            break;
+                        case STRING:
+                            cellValue = cell.getStringCellValue()+"|";
+                            break;
+                        default:
+                            break;
+                    }
+                    rowData = rowData + cellValue ;
+                }
+
+                strArr[i] = rowData.replaceAll("\\|$", "");
+            }catch(Exception e){
+                strArr[i] = "";
+            }
+        }
+        return strArr;
     }
+
+    
 
 }

@@ -31,7 +31,7 @@
                 , st_makepoint(#{x2}::double precision
                 , #{y2}::double precision ))
             ) as area_geom
-            , #{drawing_name} as drawing_name
+            , #{drawingName} as map_name
         WHERE NOT EXISTS(
             SELECT 1 FROM ${schemaName}.drawing 
             where area_geom =
@@ -40,7 +40,7 @@
                         , #{y1}::double precision) 
                         , st_makepoint(#{x2}::double precision
                         , #{y2}::double precision ))))
-            and drawing_name = #{drawing_name} 
+            and map_name = #{drawingName} 
         )
     </insert>
 
@@ -59,19 +59,19 @@
                         , st_makepoint(#{x2}::double precision
                         , #{y2}::double precision ))))
             ) as drawing_id
-            , #{floor_order}::integer as floor_order
-            , #{floor_name} as floor_name
+            , #{floorOrder}::integer as floor_order
+            , #{floorName} as floor_name
             , now()::timestamp as reg_date
         from 
             ${schemaName}.building b
         where
-            building_name = #{building_name}
+            building_name = #{buildingName}
         AND NOT EXISTS (
             SELECT 1
             FROM ${schemaName}.floor 
             WHERE building_id = b.building_id
-            AND floor_order = #{floor_order}::integer
-            AND floor_name = #{floor_name}
+            AND floor_order = #{floorOrder}::integer
+            AND floor_name = #{floorName}
         )
         group by b.building_id
     </insert>
@@ -80,12 +80,13 @@
         INSERT INTO ${schemaName}.building
         SELECT
             nextval('${schemaName}.building_id_seq') as building_id
-            ,#{building_name}
-            ,#{building_category}
+            ,#{buildingName}
+            ,#{buildingCategory}
+            ,#{buildingOrder}
          WHERE NOT EXISTS(
             SELECT 1 FROM ${schemaName}.building 
-            WHERE building_name = #{building_name}
-            AND building_category = #{building_category}
+            WHERE building_name = #{buildingName}
+            AND building_category = #{buildingCategory}
         )
     </insert>
     
@@ -336,6 +337,39 @@
             where
                 b.building_category = #{category}
     </insert>
+
+    <update id="updateBaseAreasDrawingId" parameterType="String">
+        UPDATE ${schemaName}.base_areas b set
+            drawing_id = d.drawing_id
+        FROM ${schemaName}.drawing d
+        WHERE st_intersects(b.geom,d.area_geom)
+        AND b.map_name = d.map_name
+    </update>
+    <update id="updateBaseLinesDrawingId" parameterType="String">
+        UPDATE ${schemaName}.base_lines b set
+            drawing_id = d.drawing_id
+        FROM ${schemaName}.drawing d
+        WHERE st_intersects(b.geom,d.area_geom)
+        AND b.map_name = d.map_name
+    </update>
+    <update id="updateBasePointsDrawingId" parameterType="String">
+        UPDATE ${schemaName}.base_points b set
+            drawing_id = d.drawing_id
+        FROM ${schemaName}.drawing d
+        WHERE st_intersects(b.geom,d.area_geom)
+        AND b.map_name = d.map_name
+    </update>
+
+    
+
+    <select id="selectHeaderId" parameterType="hashMap" resultType="Integer">
+        SELECT 
+            prod_detail_header_id
+        FROM 
+            ${schemaName}.prod_detail_header
+        WHERE
+            header_arr = #{header, typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[]
+    </select>
 
 
 

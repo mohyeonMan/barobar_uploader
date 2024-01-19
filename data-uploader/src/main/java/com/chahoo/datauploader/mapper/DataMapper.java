@@ -46,4 +46,10 @@ public interface DataMapper {
 
     void insertProd(HashMap<String,Object> data);
 
+    void updateBaseAreasDrawingId(String data);
+    void updateBaseLinesDrawingId(String data);
+    void updateBasePointsDrawingId(String data);
+
+    int selectHeaderId(HashMap<String,Object> data);
+
 }

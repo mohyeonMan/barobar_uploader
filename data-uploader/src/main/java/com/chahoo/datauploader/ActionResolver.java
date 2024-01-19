@@ -1,4 +1,4 @@
-package com.chahoo.datauploader.util;
+package com.chahoo.datauploader;
 
 import java.util.Scanner;
 
@@ -19,12 +19,13 @@ public class ActionResolver {
 
             System.out.print(
             "\n\n"
-            +"0 . 스키마생성\n"
+            +"0 . 현장 생성\n"
             +"1 . 층 업로드\n"
-            +"2 . 부재 업로드 (벽체 제외)\n"
-            +"3 . \n"
-            +"4 . 태그 연결\n"
-            +"5 . 프로그램 종료\n"
+            +"2 . 배경도면 연결\n"
+            +"3 . 부재 업로드 (벽체 제외)\n"
+            +"4 . 벽체 업로드 (신설동)\n"
+            +"5 . 태그 연결\n"
+            +"6 . 프로그램 종료\n"
             +"\n"
             +":: "
             );
@@ -41,12 +42,19 @@ public class ActionResolver {
                     dataManager.uploadFloors();
                     break;
                 case 2:
+                    dataManager.matchDrawing();
+                    break;
+                case 3:
                     dataManager.uploadMaterials();
                     break;
-                case 4 :
+                case 4:
+                    dataManager.uploadWallMaterials();
+                    break;
+                case 5 :
                     dataManager.matchTags();
                     break;
-                case 5 :roop = false;
+                case 6 :roop = false;
+                    break;
                 default:
                 System.out.println("\n\n알맞은 값을 입력해주세요.\n\n");
             }

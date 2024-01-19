@@ -86,6 +86,16 @@ public class DataRepository {
     public void insertProd(HashMap<String,Object> data){
         dataMapper.insertProd(data);
     }
+
+    public void updateBaseDrawingId(String data){
+        dataMapper.updateBaseAreasDrawingId(data);
+        dataMapper.updateBaseLinesDrawingId(data);
+        dataMapper.updateBasePointsDrawingId(data);
+    }
+
+    public int selectHeaderId(HashMap<String,Object> data){
+        return dataMapper.selectHeaderId(data);
+    }
     
 
 

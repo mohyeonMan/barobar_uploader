@@ -7,8 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import com.chahoo.datauploader.util.ActionResolver;
-
 @SpringBootApplication
 @EnableTransactionManagement
 @MapperScan("com.chahoo.datauploader.mapper")
